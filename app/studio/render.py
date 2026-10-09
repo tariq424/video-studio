@@ -4,6 +4,8 @@ from .llm import qa_available
 from pathlib import Path
 from . import media, qa, charts
 STYLE = ", cinematic photorealistic, natural dramatic lighting, 35mm film look, highly detailed, no text, no watermark"
+# fixed negative prompt for every WanGP image / video generation (see prompts/wanGP_style_guide.md)
+NEGATIVE = "text, watermark, logo, airline markings, registration numbers, deformed people, extra limbs, distorted faces, low quality, blurry, cartoon, anime"
 
 def chunks(text, limit=85):
     sents = re.findall(r"[^.?!]+[.?!]+[\"')\]]*|[^.?!]+$", text); out, cur, n = [], [], 0
@@ -99,7 +101,7 @@ def do_presenter(job, plan, cfg, wg, log, stop):
 def _still(cfg, wg, log, prompt, out, seed, stop, tag):
     last_issue = ""
     for t in range(3):
-        r = wg.gen({"model_type": cfg["still_model"], "prompt": prompt + STYLE, "resolution": "1920x1088",
+        r = wg.gen({"model_type": cfg["still_model"], "prompt": prompt + STYLE, "negative_prompt": NEGATIVE, "resolution": "1920x1088",
                     "num_inference_steps": 4, "seed": seed + t * 31}, log, tag, stop=stop)
         if not r["ok"]: continue
         if not qa_available(cfg):
@@ -121,7 +123,7 @@ def do_motion(job, plan, cfg, wg, log, stop):
             if media.ok(out): continue
             ok = False
             for t in range(2):
-                r = wg.gen({"model_type": cfg["video_model"], "prompt": v["prompt"] + STYLE, "resolution": "1280x720",
+                r = wg.gen({"model_type": cfg["video_model"], "prompt": v["prompt"] + STYLE, "negative_prompt": NEGATIVE, "resolution": "1280x720",
                             "video_length": 121, "num_inference_steps": 8, "seed": seed + t * 97}, log, f"motion {v['id']}", stop=stop)
                 if not r["ok"]: continue
                 if qa_available(cfg):

@@ -87,7 +87,7 @@ def run(cfg, wg, sd, fd, slots, log, stop, gpu, seed=5100, full=False, animate=F
         if not s.get("still_prompt"): r["still"] = None; r["still_why"] = "no scene prompt"; save(); continue
         if not img.exists():
             try:
-                g = wg.gen({"model_type": cfg["still_model"], "prompt": s["still_prompt"] + render.STYLE, "resolution": space(sd)["still_res"],
+                g = wg.gen({"model_type": cfg["still_model"], "prompt": s["still_prompt"] + render.STYLE, "negative_prompt": render.NEGATIVE, "resolution": space(sd)["still_res"],
                             "num_inference_steps": 4, "seed": seed + i}, log, f"still {s['key']}", stop=stop)
                 if g["ok"]: shutil.copy(g["file"], img)
             except Exception as e: log(f"  still {s['key']} failed ({str(e)[:100]})")
@@ -115,7 +115,7 @@ def run(cfg, wg, sd, fd, slots, log, stop, gpu, seed=5100, full=False, animate=F
             if not (r.get("still_ok") or (full and r.get("still"))) or "clip" in r and (r["clip"] is None or mp.exists()): continue
             if not media.ok(mp):
                 try:
-                    g = wg.gen({"model_type": cfg.get("short_i2v_model") or cfg["video_model"], "prompt": (s.get("motion") or s["still_prompt"]) + render.STYLE,
+                    g = wg.gen({"model_type": cfg.get("short_i2v_model") or cfg["video_model"], "prompt": (s.get("motion") or s["still_prompt"]) + render.STYLE, "negative_prompt": render.NEGATIVE,
                                 "image_prompt_type": "S", "image_start": str((sd / r["still"]).resolve()), "resolution": space(sd)["i2v_res"],
                                 "video_length": int(cfg.get("short_i2v_frames", 169)), "num_inference_steps": int(cfg.get("short_i2v_steps", 8)), "seed": seed + 400 + i},
                                log, f"animate {s['key']}", stop=stop)

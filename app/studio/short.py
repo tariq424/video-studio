@@ -63,12 +63,20 @@ For each beat also give:
    (role: "origin", "planned" = intended destination shown dashed, "actual" = where it really went, "stop" = a place on the way,
    "place" = just a location; real coordinates in decimal degrees). Otherwise a headline card:
    {{"kind":"headline","kicker":"1-3 words","text":"4-9 words summing up the beat","sub":"optional 3-8 words"}}
-- "still_prompt": a 30-50 word prompt for a photorealistic AI image of THIS beat, vertical framing. Describe the subject, the
-  setting and the mood, at the exact moment the narration describes (e.g. if the plane dropped, it is diving steeply; if it sat on
-  the tarmac, it is parked with emergency vehicles around; tense, never cheerful, for an emergency). The AI garbles marks, so
-  NEVER ask for any text, letters, numbers, logos, brand names, airline names or livery lettering, flags, registrations, signs
-  or real people's faces (describe generic people from behind or at a distance). For a subject, describe it by type, shape
-  and colours only (e.g. "a white single-aisle passenger jet with a plain dark blue tail, descending steeply through clouds").
+- "still_prompt": the IMAGE prompt for this beat (45-75 words). It is an instruction for an image model, NOT narration: narration
+  ("the plane descended rapidly") leaves the camera, the attitude, the gear and the light to the image model, which guesses and gets
+  them wrong. Fill all six slots, in this order, as comma-separated phrases:
+  1 Subject (concrete: type, shape, colours; an aircraft type like "Boeing 737-800" is fine) 2 Action/attitude (physical: nose
+  angle, climbing/level/descending, bank, gear up or down; for people, posture and what they do) 3 Camera (position, angle, shot
+  size: "viewed from below and behind", "low angle wide shot") 4 Setting (place, sky, time of day) 5 Mood/lighting ("cold blue
+  emergency lighting") 6 Style details for this shot only ("motion blur on wingtips"; the general look is added automatically).
+  Show the exact moment the narration describes (a plane that dropped is diving nose-down with the gear retracted; one that landed
+  is on the ground). Bad: "A jet descending steeply through clouds, tense mood." Good: "A Boeing 737-800 in a steep nose-down
+  emergency dive, viewed from below and behind, landing gear retracted, dark storm clouds at dusk, cold blue emergency lighting,
+  motion blur on wingtips". The AI garbles marks, so NEVER ask for text, letters, numbers, logos, brand or airline names, livery
+  lettering, flags, registrations, signs or real people's faces (show people from behind, in silhouette or at a distance).
+  Worked examples (narration -> image prompt):
+{examples}
 - "motion": 8-15 words for animating that image for 7 seconds: what moves and how the camera moves
   (e.g. "the jet banks and descends through clouds, camera tracks alongside"). Slow, physically plausible motion.
 Also give "title" (max 60 chars, YouTube title), "tag" (max 28 chars, small label shown at the top, e.g. "MOONSHOTS #293 · CONDENSED"),
@@ -79,6 +87,18 @@ Reply with ONLY JSON:
 {{"title":"...","tag":"...","description":"...","source_spoken":"...","beats":[{{"vo":"...","graphics":[{{"at":null,"g":{{...}}}},{{"at":"word","g":{{...}}}}],"queries":["...","..."],"subject":null,"backdrop":{{...}},"still_prompt":"...","motion":"..."}}]}}"""
 
 def _log_none(m): pass
+
+def still_examples(n=10):
+    """Worked examples from prompts/wanGP_style_guide.md (narration -> image prompt), for the script AI."""
+    from . import config
+    f = config.ROOT / "prompts" / "wanGP_style_guide.md"
+    try: t = f.read_text(encoding="utf-8")
+    except Exception: return "  (style guide not found)"
+    t = t.split("## Worked examples", 1)[-1]
+    out = []
+    for m in re.finditer(r"\*\*\d+\.\s*([^*]+)\*\*\s*Narration:\s*(.+?)\s*Prompt:\s*`([^`]+)`", t, re.S):
+        out.append(f"  - {m.group(1).strip()}: {' '.join(m.group(2).split())} -> {' '.join(m.group(3).split())}")
+    return "\n".join(out[:n]) or "  (no examples)"
 
 def _clean_backdrop(bd, vo):
     """Validate the script AI's fallback graphic; anything malformed becomes a headline card."""
@@ -149,7 +169,7 @@ def write_short(cfg, meta, transcript, secs, mode, long_title, log, stop, srcdir
             tries.append((abs(n - words), j))
             if n < words * lo: raise ValueError(f"narration is {n} words in total but must be about {words}; add detail from the notes")
             if n > words * hi: raise ValueError(f"narration is {n} words in total but must be at most {int(words * 1.05)}; cut weaker points")
-        prompt = SHORT.format(secs=int(secs), words=words, title=title, channel=channel, notes=notes[:24000], nb=nb,
+        prompt = SHORT.format(secs=int(secs), words=words, title=title, channel=channel, notes=notes[:24000], nb=nb, examples=still_examples(),
                               people=(meta.get("description") or "")[:1200] or "(see notes)")
         try: j = llm.chat_json(SYSTEM, prompt, max_tokens=8000, check=chk)
         except RuntimeError:
@@ -180,7 +200,7 @@ def write_short(cfg, meta, transcript, secs, mode, long_title, log, stop, srcdir
             plan["sections"].append({"id": f"b{i}", "title": f"Beat {i + 1}", "vo": re.sub(r"\s+", " ", b["vo"]).strip(),
                                      "queries": [q for q in b.get("queries", []) if isinstance(q, str)][:3] or ["city skyline aerial"],
                                      "subject": sj, "backdrop": _clean_backdrop(b.get("backdrop"), b["vo"]),
-                                     "still_prompt": str(b.get("still_prompt") or "")[:500], "motion": str(b.get("motion") or "")[:160],
+                                     "still_prompt": str(b.get("still_prompt") or "")[:700], "motion": str(b.get("motion") or "")[:160],
                                      "visuals": [{"type": "chart", "chart": g["g"], "at": g.get("at")} for g in gs]})
         log("Checking the Short against the source (names, attributions, numbers)...")
         plan = fact_check(llm, plan, meta, transcript, log, stop)
