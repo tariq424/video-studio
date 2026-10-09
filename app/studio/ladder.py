@@ -11,22 +11,20 @@ from pathlib import Path
 from . import media
 from .llm import parse_json
 
-CHECK = """This {what} will be shown full-screen in a news Short while the narrator says:
-"{narration}"
+CHECK = """This {what} will be shown full-screen in a news Short. It is meant to show:
+"{desc}"
+Moment: {moment}
 {subject}
-Judge ONLY what a picture can show: the subject, what it is doing (its action, attitude and direction of motion), the setting,
-the moment (in the air, landing, on the ground, inside) and the mood. Events a picture cannot show - signals or codes being sent,
-alerts, calls, orders, statements, investigations, numbers, names, reasons - are NOT required: never answer "no" because the
-picture doesn't show them. A plane visibly in crisis fits narration about that crisis.
+Judge ONLY these, by looking: the subject (the same kind of thing), what it is doing (action, attitude, direction of motion -
+e.g. nose-down/descending vs nose-up/climbing vs level), the moment (in the air, landing, on the ground, inside) and the mood
+(tense for an emergency, never cheerful). Ignore the camera angle, the lighting and style words.
 First look at the picture and describe what it ACTUALLY shows, then judge it. Reply with ONLY JSON, in this order:
 {{"seen": "max 15 words: what the picture actually shows - the subject, the setting, and where it is (in the air, landing, on the
   ground, inside) and, for an aircraft, its attitude (nose up/climbing, level, nose down/descending)",
- "fits": "yes" or "no" - does it show what this sentence describes: the same kind of subject, the same moment and action
-  (e.g. a plane diving if the narration says it dropped, on the ground if it says it landed or sat on the tarmac) and the same mood
-  (tense for an emergency, never cheerful)?,
+ "fits": "yes" or "no" - does it show that subject doing that, at that moment, in that mood?,
  "marks": true or false - any readable text, letters, numbers, logo, brand name, airline name or livery lettering, flag or registration?,
  "garbled": true or false - melted or deformed objects, broken shapes, extra or missing limbs, warped faces, impossible geometry{extra}?,
- "why": "max 12 words: what the narration needs that the picture does NOT show - it must agree with \"seen\""{worst}}}"""
+ "why": "max 12 words: what the description needs that the picture does NOT show - it must agree with \"seen\""{worst}}}"""
 
 def space(sd):
     """Frame of the workspace: Shorts are portrait (default); the long-video edit workspace has short/space.json = landscape."""
@@ -39,7 +37,7 @@ def space(sd):
 
 def _yes(v): return str(v).strip().lower() in ("true", "yes", "1")
 
-def check(cfg, img, narration, subject=None, video=False, info=None):
+def check(cfg, img, narration, subject=None, video=False, info=None, visual=None):
     """-> (ok, reason). Fails closed: if the vision model can't judge it, the visual isn't used.
     info (dict) receives extras: "worst" (1-3, the worst frame of a video strip)."""
     from .footage import _vision
@@ -48,8 +46,13 @@ def check(cfg, img, narration, subject=None, video=False, info=None):
     if subject:
         subj = (f"The story is about {subject.get('name')}. The picture should show the same kind of thing (same type, shape and colours), "
                 f"but it must NOT show its name or logo.")
+    # judged against the beat's VISUAL description (its image prompt), not the narration: narration also tells things no picture
+    # can show (signals, alerts, intentions), and a check against it rejects good pictures for not showing them
+    from .coherence import phase
+    ph = phase(narration) or "not specified"
+    desc = (visual or narration)[:600].replace('"', "'")
     prompt = CHECK.format(what="video clip (three frames from it, left to right)" if video else "AI-generated picture",
-                          narration=narration[:500].replace('"', "'"), subject=subj,
+                          desc=desc, moment=ph, subject=subj,
                           extra=", or the subject changing shape between the frames" if video else "",
                           worst=',\n "worst_frame": 1, 2 or 3 - the frame that looks worst' if video else "")
     try: j = parse_json(_vision(cfg, img, prompt))
@@ -111,7 +114,7 @@ def run(cfg, wg, sd, fd, slots, log, stop, gpu, seed=5100, full=False, animate=F
         for s in todo:
             try: pause()
             except Exception: footage.unload_vet_model(cfg); raise
-            r = st[s["key"]]; ok, why = check(cfg, sd / r["still"], s["vo"], s.get("subject"))
+            r = st[s["key"]]; ok, why = check(cfg, sd / r["still"], s["vo"], s.get("subject"), visual=s.get("still_prompt"))
             r["still_ok"], r["still_why"] = ok, why; save()
         footage.unload_vet_model(cfg)
     # step 3: image-to-video of the stills that passed
@@ -141,7 +144,7 @@ def run(cfg, wg, sd, fd, slots, log, stop, gpu, seed=5100, full=False, animate=F
             for s in todo:
                 r = st[s["key"]]; strip = fd / f"{s['key']}_i2v_strip.jpg"
                 info = {}
-                try: media.frames_strip(sd / r["clip"], strip); ok, why = check(cfg, strip, s["vo"], s.get("subject"), video=True, info=info)
+                try: media.frames_strip(sd / r["clip"], strip); ok, why = check(cfg, strip, s["vo"], s.get("subject"), video=True, info=info, visual=s.get("motion") and f"{s.get('still_prompt', '')}; moving: {s['motion']}" or s.get("still_prompt"))
                 except Exception as e: ok, why = False, f"frame check failed ({str(e)[:50]})"
                 r["clip_ok"], r["clip_why"], r["clip_worst"] = ok, why, info.get("worst", 2); save()
             footage.unload_vet_model(cfg)
