@@ -6,6 +6,8 @@ from . import media, qa, charts
 STYLE = ", cinematic photorealistic, natural dramatic lighting, 35mm film look, highly detailed, no text, no watermark"
 # fixed negative prompt for every WanGP image / video generation (see prompts/wanGP_style_guide.md)
 NEGATIVE = "text, watermark, logo, airline markings, registration numbers, deformed people, extra limbs, distorted faces, low quality, blurry, cartoon, anime"
+NEG_AIR = ", landing gear, wheels, undercarriage"   # a plane in the air: the gear is removed here, never named in the prompt
+def negative(phase=""): return NEGATIVE + (NEG_AIR if phase == "air" else "")
 
 def chunks(text, limit=85):
     sents = re.findall(r"[^.?!]+[.?!]+[\"')\]]*|[^.?!]+$", text); out, cur, n = [], [], 0

@@ -68,12 +68,15 @@ For each beat also give:
   them wrong. Fill all six slots, in this order, as comma-separated phrases:
   1 Subject (concrete: type, shape, colours; an aircraft type like "Boeing 737-800" is fine) 2 Action/attitude (physical: nose
   angle, climbing/level/descending, bank, gear up or down; for people, posture and what they do) 3 Camera (position, angle, shot
-  size: "viewed from below and behind", "low angle wide shot") 4 Setting (place, sky, time of day) 5 Mood/lighting ("cold blue
+  size; when the beat describes a direction of motion, choose the angle where that direction is visible: a dive, descent or climb
+  needs a side view from slightly above, level flight can use any angle) 4 Setting (place, sky, time of day) 5 Mood/lighting ("cold blue
   emergency lighting") 6 Style details for this shot only ("motion blur on wingtips"; the general look is added automatically).
-  Show the exact moment the narration describes (a plane that dropped is diving nose-down with the gear retracted; one that landed
-  is on the ground). Bad: "A jet descending steeply through clouds, tense mood." Good: "A Boeing 737-800 in a steep nose-down
-  emergency dive, viewed from below and behind, landing gear retracted, dark storm clouds at dusk, cold blue emergency lighting,
-  motion blur on wingtips". The AI garbles marks, so NEVER ask for text, letters, numbers, logos, brand or airline names, livery
+  Show the exact moment the narration describes (a plane that dropped is diving nose-down; one that landed is on the ground).
+  Never name a part that should be absent ("gear retracted" makes the model draw gear): describe what IS there ("clean smooth
+  underside"); for planes in the air the pipeline removes landing gear through the negative prompt.
+  Bad: "A jet descending steeply through clouds, tense mood." Good: "A Boeing 737-800 in a steep nose-down emergency dive, nose
+  pitched down toward the ground, clean smooth underside, side view from slightly above so the downward angle is clear, dark storm
+  clouds at dusk, cold blue emergency lighting, motion blur on wingtips". The AI garbles marks, so NEVER ask for text, letters, numbers, logos, brand or airline names, livery
   lettering, flags, registrations, signs or real people's faces (show people from behind, in silhouette or at a distance).
   Worked examples (narration -> image prompt):
 {examples}

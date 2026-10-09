@@ -14,6 +14,10 @@ from .llm import parse_json
 CHECK = """This {what} will be shown full-screen in a news Short while the narrator says:
 "{narration}"
 {subject}
+Judge ONLY what a picture can show: the subject, what it is doing (its action, attitude and direction of motion), the setting,
+the moment (in the air, landing, on the ground, inside) and the mood. Events a picture cannot show - signals or codes being sent,
+alerts, calls, orders, statements, investigations, numbers, names, reasons - are NOT required: never answer "no" because the
+picture doesn't show them. A plane visibly in crisis fits narration about that crisis.
 First look at the picture and describe what it ACTUALLY shows, then judge it. Reply with ONLY JSON, in this order:
 {{"seen": "max 15 words: what the picture actually shows - the subject, the setting, and where it is (in the air, landing, on the
   ground, inside) and, for an aircraft, its attitude (nose up/climbing, level, nose down/descending)",
@@ -61,6 +65,11 @@ def check(cfg, img, narration, subject=None, video=False, info=None):
     if str(j.get("fits", "no")).strip().lower() != "yes": return False, "doesn't fit the narration" + (f": {why}" if why else "")
     return True, why
 
+def _phase(s):
+    """Where the beat is (air / landing / ground): the slot's own, else read from its narration."""
+    from .coherence import phase
+    return s.get("phase") or phase(s.get("vo", ""))
+
 def _rel(p, sd): return str(Path(p).relative_to(sd)).replace("\\", "/")
 
 def run(cfg, wg, sd, fd, slots, log, stop, gpu, seed=5100, full=False, animate=False, pause=None):
@@ -87,7 +96,7 @@ def run(cfg, wg, sd, fd, slots, log, stop, gpu, seed=5100, full=False, animate=F
         if not s.get("still_prompt"): r["still"] = None; r["still_why"] = "no scene prompt"; save(); continue
         if not img.exists():
             try:
-                g = wg.gen({"model_type": cfg["still_model"], "prompt": s["still_prompt"] + render.STYLE, "negative_prompt": render.NEGATIVE, "resolution": space(sd)["still_res"],
+                g = wg.gen({"model_type": cfg["still_model"], "prompt": s["still_prompt"] + render.STYLE, "negative_prompt": render.negative(_phase(s)), "resolution": space(sd)["still_res"],
                             "num_inference_steps": 4, "seed": seed + i}, log, f"still {s['key']}", stop=stop)
                 if g["ok"]: shutil.copy(g["file"], img)
             except Exception as e: log(f"  still {s['key']} failed ({str(e)[:100]})")
@@ -115,7 +124,7 @@ def run(cfg, wg, sd, fd, slots, log, stop, gpu, seed=5100, full=False, animate=F
             if not (r.get("still_ok") or (full and r.get("still"))) or "clip" in r and (r["clip"] is None or mp.exists()): continue
             if not media.ok(mp):
                 try:
-                    g = wg.gen({"model_type": cfg.get("short_i2v_model") or cfg["video_model"], "prompt": (s.get("motion") or s["still_prompt"]) + render.STYLE, "negative_prompt": render.NEGATIVE,
+                    g = wg.gen({"model_type": cfg.get("short_i2v_model") or cfg["video_model"], "prompt": (s.get("motion") or s["still_prompt"]) + render.STYLE, "negative_prompt": render.negative(_phase(s)),
                                 "image_prompt_type": "S", "image_start": str((sd / r["still"]).resolve()), "resolution": space(sd)["i2v_res"],
                                 "video_length": int(cfg.get("short_i2v_frames", 169)), "num_inference_steps": int(cfg.get("short_i2v_steps", 8)), "seed": seed + 400 + i},
                                log, f"animate {s['key']}", stop=stop)
